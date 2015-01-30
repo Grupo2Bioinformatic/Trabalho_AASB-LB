@@ -102,6 +102,7 @@ def get_traducao(record):
     for j in record.features:
         if j.type=="CDS":
             dadostraducao.append((j.qualifiers["locus_tag"][0],j.qualifiers["translation"][0]))
+            dadostraducao.append("Tamanho:")
             dadostraducao.append(len(j.qualifiers["translation"][0]))
     return(dadostraducao)
     
@@ -117,7 +118,7 @@ def save(results):
     name=input("Indique o nome para o ficheiro:")
     file = open('%s.txt'%(name),'w')
     for i in range(len(results)):                                       
-        file.writelines(results[i])
+        file.writelines(str(results[i]))
         file.writelines("\n")
     file.close()
 
@@ -228,4 +229,7 @@ def main():
 #main
 if __name__ == '__main__':
     main()
+        
+        
+        
         
