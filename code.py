@@ -66,8 +66,8 @@ def  get_proteinID(record):
 def  get_geneID(record):
     CDS_geneID =[]
     for i in record.features:
-        if i.type == "CDS":
-            CDS_geneID.append(i.qualifiers["db_xref"][1].strip("GeneID:"))
+        if i.type == "gene":
+            CDS_geneID.append(i.qualifiers["db_xref"][0].strip("GeneID:"))
     return CDS_geneID
     
 def  get_LocusTag(record):
