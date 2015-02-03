@@ -1,5 +1,6 @@
 from Bio import SeqIO
 from Bio import Entrez
+from Bio.Blast import NCBIWWW,NCBIXML
 
 
 def get_sequence_file(seqstart,seqstop,file_name): #246001,468400
@@ -13,19 +14,101 @@ def get_sequence_file(seqstart,seqstop,file_name): #246001,468400
 
     record=SeqIO.write(seq_record, "%s.gb"%(file_name), "genbank")
     handle.close()
-    return record
+    return (record)
     
 def read_sequence_file(file_name):
     record=SeqIO.read("%s.gb"%(file_name), "genbank")
-    return record
+    return (record)
+ 
+def get_info(record):
+    CDS_proteinID =[]
+    GeneID=[]
+    CDS_GI =[]
+    LocusTag =[]
+    CDS_ECnumber =[]
+    Gene_name =[]
+    dadostraducao=[]
+    dadosfuncoes=[]
+    CDS_note =[]
+    size=[]
+    for i in record.features: 
+        if i.type == "CDS": 
+            CDS_proteinID.append(i.qualifiers["protein_id"][0])
+            CDS_GI.append(i.qualifiers["db_xref"][0].strip("GI:"))
+            if "EC_number" in i.qualifiers:
+                CDS_ECnumber.append(i.qualifiers["EC_number"][0])
+            else:
+                CDS_ECnumber.append("None")
+            dadostraducao.append((i.qualifiers["locus_tag"][0],i.qualifiers["translation"][0]))
+            dadostraducao.append("Tamanho:")
+            dadostraducao.append(len(i.qualifiers["translation"][0]))
+            dadosfuncoes.append((i.qualifiers["locus_tag"][0],i.qualifiers["product"][0]))
+            size.append(len(i.qualifiers["translation"][0]))
+            if "note" in i.qualifiers:
+                CDS_note.append((i.qualifiers["locus_tag"][0],i.qualifiers["note"][0]))
+            else:
+                CDS_note.append("None")
+        if i.type == "gene":
+            GeneID.append(i.qualifiers["db_xref"][0].strip("GeneID:"))
+            LocusTag.append(i.qualifiers["locus_tag"][0])
+            if "gene" in i.qualifiers:
+                Gene_name.append(i.qualifiers["gene"][0])
+            else:
+                Gene_name.append("None")
+    return (CDS_proteinID,GeneID,CDS_GI,LocusTag,CDS_ECnumber,Gene_name,dadostraducao,dadosfuncoes,CDS_note,size)
 
+def save(results):
+    name=input("Indique o nome para o ficheiro:")
+    file = open('%s.txt'%(name),'w')
+    for i in range(len(results)):                                       
+        file.writelines(str(results[i]))
+        file.writelines("\n")
+    file.close()    
+
+def blast(GI,filename):
+    result_handle = NCBIWWW.qblast("blastp", "swissprot", GI)
+    save_file = open("%s.xml"%(filename), "w")
+    save_file.write(result_handle.read())
+    save_file.close()
+    result_handle.close()
+
+def analisa(filename):
+    result_handle = open("%s.xml"%(filename))
+    E_VALUE_THRESH = 0.05
+    blast_record = NCBIXML.read(result_handle)
+    for alignment in blast_record.alignments:
+        for hsp in alignment.hsps:
+            if hsp.expect < E_VALUE_THRESH:
+                print("****Alignment****")
+                print('sequence:', alignment.title)
+                print('length:', alignment.length)
+                print('e value:', hsp.expect)
+            else:
+                print("Os resultados encontrados não são considerados bons")
+    result_handle.close()
+    
 def table(table_name):
     f = open('%s.txt'%(table_name), 'r')
     tabela=[]
     for line in f.readlines():
         tabela.append(line.split('\t'))
     f.close
-    return tabela
+    return (tabela)
+    
+def compare(table,seqstart,seqstop):
+    p_ID_Table=[]
+    for line in range(1,len(table)):
+        if (table[line][2]>=seqstart and table[line][3]<=seqstop):
+            p_ID_Table.append(table[line][8]) 
+    return (p_ID_Table)    
+
+def valida(Tab_ID,CDS_ID):
+    valid=[]
+    for p in range(len(CDS_ID)):
+        for k in range(len(Tab_ID)):
+            if CDS_ID[p]==Tab_ID[k]:
+                valid.append((CDS_ID[p],"=Válido"))
+    return valid
     
 def get_info_table(tabela,seqstart,seqstop):
     posicoes=[]
@@ -37,91 +120,6 @@ def get_info_table(tabela,seqstart,seqstop):
             localfim.append(int(tabela[i][3])-(int(seqstart)+1))
         i+=1
     return (posicoes,localfim)
- 
-def get_CDS(record):
-    cds=[]
-    for i in range(len(record.features)): 
-        if record.features[i].type == "CDS": 
-            cds.append(i)
-        i=+1
-    return cds
-
-    
-def get_gene(record):
-    gene=[]
-    for i in range(len(record.features)): 
-        if (record.features[i].type == "gene"):
-            gene.append(i)
-        i=+1
-    return gene
-
-
-def  get_proteinID(record):
-    CDS_proteinID =[]
-    for i in record.features:
-        if i.type == "CDS":
-            CDS_proteinID.append(i.qualifiers["protein_id"][0])
-    return CDS_proteinID
-
-def  get_geneID(record):
-    CDS_geneID =[]
-    for i in record.features:
-        if i.type == "gene":
-            CDS_geneID.append(i.qualifiers["db_xref"][0].strip("GeneID:"))
-    return CDS_geneID
-    
-def  get_LocusTag(record):
-    CDS_LocusTag =[]
-    for i in record.features:
-        if i.type == "gene":
-            CDS_LocusTag.append(i.qualifiers["locus_tag"][0])
-    return CDS_LocusTag
-    
-def  get_ECnumber(record):
-    CDS_ECnumber =[]
-    for i in record.features:
-        if i.type == "CDS":
-            if "EC_number" in i.qualifiers:
-                CDS_ECnumber.append(i.qualifiers["EC_number"][0])
-            else:
-                CDS_ECnumber.append("None")
-    return CDS_ECnumber
-    
-def  get_gene_name(record):
-    Gene_name =[]
-    for i in record.features:
-        if i.type == "gene":
-            if "gene" in i.qualifiers:
-                Gene_name.append(i.qualifiers["gene"][0])
-            else:
-                Gene_name.append("None")
-    return Gene_name
-
-def get_traducao(record):
-    dadostraducao=[]
-    for j in record.features:
-        if j.type=="CDS":
-            dadostraducao.append((j.qualifiers["locus_tag"][0],j.qualifiers["translation"][0]))
-            dadostraducao.append("Tamanho:")
-            dadostraducao.append(len(j.qualifiers["translation"][0]))
-    return(dadostraducao)
-    
-def get_funcao(record):
-    dadosfuncoes=[]
-    for i in record.features:
-        if i.type == "CDS":
-            if 'product' in i.qualifiers:
-                dadosfuncoes.append((i.qualifiers["locus_tag"][0],i.qualifiers["product"][0]))
-    return(dadosfuncoes)
-    
-def save(results):
-    name=input("Indique o nome para o ficheiro:")
-    file = open('%s.txt'%(name),'w')
-    for i in range(len(results)):                                       
-        file.writelines(str(results[i]))
-        file.writelines("\n")
-    file.close()
-
     
 def main():
     res=input("Ja tem sequencia S/N? ")
@@ -138,87 +136,105 @@ def main():
     else:
         
         print ("Opção inválida")
-    
+    record=SeqIO.read("%s.gb"%(file_name), "genbank")
+    (CDS_proteinID,GeneID,CDS_GI,LocusTag,CDS_ECnumber,Gene_name,dadostraducao,dadosfuncoes,CDS_note,size)=get_info(record)
     while True:
 
         op=input("""
-        1 - Leitura da tabela
-        2 - Leitura dos genes na tabela
-        3 - Localização dos CDS na sequência
-        4 - Localização dos Genes na sequência
-        5 - Ver ProteinID
-        6 - Ver GeneID 
-        7 - Ver Locus_tag 
-        8 - Ver EC_Number
-        9 - Ver Nome do Gene
-        10 - Ver tradução
-        11 - Ver funções
+        1 - Ver ProteinID
+        2 - Ver GeneID 
+        3 - Ver GI
+        4 - Ver Locus_tag 
+        5 - Ver EC_Number
+        6 - Ver Nome do Gene
+        7 - Ver tradução
+        8 - Ver funções
+        9 - Ver descrições
+        10 - Realizar Blast
+        11 - Leitura da tabela
+        12 - Validação
         99 - Sair!
         O que pretende fazer?
         """)
         if op=='1':
-            table_name=input('Indique o nome da tabela a ler:')
-            tabela=table(table_name)
+            print(CDS_proteinID)
+            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
+            if res=="s" or res=="S":
+                save(CDS_proteinID)
+                print("Resultados gravados")
+
         elif op=='2':
-            (posicoes,localfim)=get_info_table(tabela,seqstart,seqstop)
-            print(posicoes)
+            print(GeneID)            
+            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
+            if res=="s" or res=="S":
+                save(GeneID)
+                print("Resultados gravados")
         elif op=='3':
-            record=SeqIO.read("%s.gb"%(file_name), "genbank")
-            cds=get_CDS(record)
-            print ("Numero de features CDS: " + str(len(cds)))
-            print ("Localizacao: "+ str(cds))
+            print(CDS_GI)            
+            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
+            if res=="s" or res=="S":
+                save(CDS_GI)
+                print("Resultados gravados")
         elif op=='4':
-            gene=get_gene(record)
-            print ("Numero de features Gene: " + str(len(gene)))
-            print ("Localizacao: "+ str(gene))
-        elif op=='5':
-            proteinID=get_proteinID(record)
-            print(proteinID)
-            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
-            if res=="s" or res=="S":
-                save(proteinID)
-                print("Resultados gravados")
-        elif op=='6': 
-            geneID=get_geneID(record)
-            print(geneID)            
-            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
-            if res=="s" or res=="S":
-                save(geneID)
-                print("Resultados gravados")
-        elif op=='7':
-            LocusTag=get_LocusTag(record)
             print(LocusTag)
             res=input("Deseja gravar os resultados num ficheiro?(S/N):")
             if res=="s" or res=="S":
                 save(LocusTag)
                 print("Resultados gravados")
-        elif op=='8':           
-            ECnumber=get_ECnumber(record)
-            print(ECnumber)
+        elif op=='5':
+            print(CDS_ECnumber)
             res=input("Deseja gravar os resultados num ficheiro?(S/N):")
             if res=="s" or res=="S":
-                save(ECnumber)
+                save(CDS_ECnumber)
                 print("Resultados gravados")
-        elif op=='9': 
-            Gene_name=get_gene_name(record)
+        elif op=='6': 
             print(Gene_name)
             res=input("Deseja gravar os resultados num ficheiro?(S/N):")
             if res=="s" or res=="S":
                 save(Gene_name)
                 print("Resultados gravados")
-        elif op=='10': 
-            trans=get_traducao(record)
-            print(trans)
+        elif op=='7':
+            print(dadostraducao)
             res=input("Deseja gravar os resultados num ficheiro?(S/N):")
             if res=="s" or res=="S":
-                save(trans)
+                save(dadostraducao)
                 print("Resultados gravados")
-        elif op=='11': 
-            func=get_funcao(record)
-            print(func)
+        elif op=='8':           
+            print(dadosfuncoes)
             res=input("Deseja gravar os resultados num ficheiro?(S/N):")
             if res=="s" or res=="S":
-                save(func)
+                save(dadosfuncoes)
+                print("Resultados gravados")
+        elif op=='9': 
+            print(CDS_note)
+            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
+            if res=="s" or res=="S":
+                save(CDS_note)
+                print("Resultados gravados")
+        elif op=='10': 
+            res=input("Indique o GI do gene:")
+            file=input("Indique o nome para o ficheiro:")
+            blast(res,file)
+            esc=input("Deseja analisar o blast?(S/N):")
+            if esc=="S" or esc=="s":
+                analisa(file)
+        elif op=='11':
+            table_name=input('Indique o nome da tabela a ler:')
+            tabela=table(table_name)
+            print(tabela)
+        elif op=='12':
+            tab_ID=compare(tabela,seqstart,seqstop)
+            valid=valida(tab_ID,CDS_proteinID)
+            print(valid)
+            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
+            if res=="s" or res=="S":
+                save(valid)
+                print("Resultados gravados")
+        elif op=='13': 
+            print(size)
+            res=input("Deseja gravar os resultados num ficheiro?(S/N):")
+            if res=="s" or res=="S":
+                save(size)
                 print("Resultados gravados")
         elif op=='99':
             print("\n Adeus!")
@@ -229,7 +245,4 @@ def main():
 #main
 if __name__ == '__main__':
     main()
-        
-        
-        
         
